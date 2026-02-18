@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  mariadb:
+    build:
+      context: ./requirements/mariadb
+      dockerfile: Dockerfile
+    container_name: mariadb
+    image: mariadb:inception
+    restart: always
+    networks:
+      - inception-network
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    env_file:
+      - .env
+    secrets:
+      - db_root_password
+      - db_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wordpress:
+    build:
+      context: ./requirements/wordpress
+      dockerfile: Dockerfile
+    container_name: wordpress
+    image: wordpress:inception
+    restart: always
+    networks:
+      - inception-network
+    volumes:
+      - wordpress-data:/var/www/html
+    env_file:
+      - .env
+    secrets:
+      - db_password
+      - wp_admin_password
+      - wp_user_password
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php-fpm8.2", "-t"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    build:
+      context: ./requirements/nginx
+      dockerfile: Dockerfile
+    container_name: nginx
+    image: nginx:inception
+    restart: always
+    networks:
+      - inception-network
+    volumes:
+      - wordpress-data:/var/www/html:ro
+    ports:
+      - "443:443"
+    env_file:
+      - .env
+    depends_on:
+      wordpress:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "https://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  inception-network:
+    driver: bridge
+
+volumes:
+  wordpress-data:
+    external: true
+    name: wordpress-data
+  mariadb-data:
+    external: true
+    name: mariadb-data
+
+secrets:
+  db_root_password:
+    file: ../secrets/db_root_password.txt
+  db_password:
+    file: ../secrets/db_password.txt
+  wp_admin_password:
+    file: ../secrets/wp_admin_password.txt
+  wp_user_password:
+    file: ../secrets/wp_user_password.txt
