@@ -17,6 +17,7 @@ RUN apt-get update && \
     php8.2-redis \
     curl \
     mariadb-client \
+    && phpenmod mysqli pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
 
 # Install WP-CLI
